@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Student Panel</title></head>
+<body>
+<h1>Student Panel</h1>
+<input type="text" id="student" placeholder="Your name">
+<button onclick="enter()">Enter</button>
+<div id="panel"></div>
+<script>
+function enter(){
+  document.getElementById("panel").innerText = "Welcome, "+student.value;
+}
+</script>
+</body></html>
