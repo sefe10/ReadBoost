@@ -1,0 +1,17 @@
+{
+  "name": "ai-reading-platform",
+  "version": "2.0.0",
+  "description": "Reading analysis with teacher login, student tracking, Express + SQLite",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
