@@ -1,0 +1,145 @@
+
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Öğrenci Paneli</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="df">
+        <h1>🧒 Öğrenci Paneli</h1>
+        <a href="index.html"><button class="secondary">← Ana Sayfa</button></a>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <label>Ad Soyad</label>
+          <input id="studentName" placeholder="Ad Soyad" />
+        </div>
+        <div>
+          <label>Atanan Metin</label>
+          <div id="textInfo"><span class="badge">Yükleniyor...</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="textCard" style="display:none;">
+      <h2 id="tTitle"></h2>
+      <p id="tContent" class="mono"></p>
+      <div class="df">
+        <div><strong>Süre:</strong> <span id="tDuration"></span> sn</div>
+        <div class="flex">
+          <button id="startBtn">Okumayı Başlat</button>
+          <button id="stopBtn" class="secondary" disabled>Bitir</button>
+        </div>
+      </div>
+      <p><strong>Kalan:</strong> <span id="countdown">-</span></p>
+    </div>
+
+    <div class="card" id="resultCard" style="display:none;">
+      <h2>Sonuç</h2>
+      <div id="summary"></div>
+      <div id="diffContainer" class="mono" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentText = null;
+    let recognizing = false;
+    let recog;
+    let captured = [];
+    let left = 0;
+    let timer;
+
+    async function fetchLatest(){
+      const res = await fetch('/api/texts/latest');
+      currentText = await res.json();
+      const info = document.getElementById('textInfo');
+      if(!currentText){ info.textContent='Henüz metin yok'; return; }
+      info.textContent = currentText.title + ' • ' + new Date(currentText.created_at).toLocaleString();
+      document.getElementById('tTitle').textContent = currentText.title;
+      document.getElementById('tContent').textContent = currentText.content;
+      document.getElementById('tDuration').textContent = currentText.duration_sec;
+      document.getElementById('textCard').style.display='block';
+    }
+    fetchLatest();
+
+    function initRecog(){
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if(!SR){ alert('Tarayıcınız konuşmayı metne çevirme özelliğini desteklemiyor. Lütfen Chrome kullanın.'); return null; }
+      const r = new SR();
+      r.lang = 'tr-TR';
+      r.continuous = true;
+      r.interimResults = true;
+      r.onresult = (e) => {
+        for(let i=e.resultIndex; i<e.results.length; i++){
+          const res = e.results[i];
+          if(res.isFinal){
+            captured.push(res[0].transcript);
+          }
+        }
+      };
+      r.onerror = (e)=> console.log('Speech error', e);
+      r.onend = ()=> {
+        if (recognizing) { try { r.start(); } catch {} }
+      };
+      return r;
+    }
+
+    function start(){
+      const name = document.getElementById('studentName').value.trim();
+      if(!name){ alert('Ad Soyad giriniz'); return; }
+      if(!currentText){ alert('Atanmış metin yok'); return; }
+      recog = initRecog();
+      if(!recog) return;
+      captured = [];
+      recognizing = true;
+      try { recog.start(); } catch(e){ console.log(e); }
+      left = currentText.duration_sec;
+      document.getElementById('countdown').textContent = left;
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+      timer = setInterval(()=>{
+        left--;
+        document.getElementById('countdown').textContent = left;
+        if(left <= 0){ stop(); }
+      }, 1000);
+    }
+
+    async function stop(){
+      recognizing = false;
+      if(recog){ try{ recog.stop(); }catch{} }
+      clearInterval(timer);
+      document.getElementById('stopBtn').disabled = true;
+
+      const transcript = captured.join(' ').trim();
+      const name = document.getElementById('studentName').value.trim();
+      const payload = {
+        student_name: name,
+        text_id: currentText.id,
+        transcript,
+        duration_sec: currentText.duration_sec
+      };
+      const res = await fetch('/api/readings', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const out = await res.json();
+      document.getElementById('resultCard').style.display='block';
+      document.getElementById('summary').innerHTML = `
+        <div class="flex">
+          <div class="badge">Kelime: ${out.words_read}</div>
+          <div class="badge">Hata: ${out.errors}</div>
+          <div class="badge">Hız: ${out.wpm} k/dk</div>
+        </div>`;
+      document.getElementById('diffContainer').innerHTML = out.detail_html;
+      document.getElementById('startBtn').disabled = false;
+    }
+
+    document.getElementById('startBtn').addEventListener('click', start);
+    document.getElementById('stopBtn').addEventListener('click', stop);
+  </script>
+</body>
+</html>
