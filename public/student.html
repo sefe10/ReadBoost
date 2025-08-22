@@ -1,13 +1,823 @@
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Student Panel</title></head>
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Öğrenci Paneli</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .card h1, .card h2 {
+      margin-top: 0;
+    }
+    .input-group {
+      margin: 15px 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #333;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    input[type="text"]:focus {
+      border-color: #007cba;
+      outline: none;
+    }
+    button {
+      background: #007cba;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #005a87;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .btn-success {
+      background: #28a745;
+    }
+    .btn-success:hover {
+      background: #218838;
+    }
+    .btn-warning {
+      background: #ffc107;
+      color: #212529;
+    }
+    .btn-warning:hover {
+      background: #e0a800;
+    }
+    .btn-danger {
+      background: #dc3545;
+    }
+    .btn-danger:hover {
+      background: #c82333;
+    }
+    .text-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .text-card {
+      background: #f8f9fa;
+      border: 2px solid #e9ecef;
+      border-radius: 10px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .text-card:hover {
+      border-color: #007cba;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 124, 186, 0.15);
+    }
+    .text-card.attempted {
+      border-color: #28a745;
+      background: #f8fff9;
+    }
+    .text-card h3 {
+      margin: 0 0 8px 0;
+      color: #333;
+    }
+    .text-meta {
+      font-size: 14px;
+      color: #666;
+      margin: 8px 0;
+    }
+    .text-stats {
+      background: white;
+      border-radius: 6px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    .stat-item {
+      display: inline-block;
+      margin-right: 12px;
+      font-weight: bold;
+    }
+    .stat-best {
+      color: #28a745;
+    }
+    .stat-attempts {
+      color: #007cba;
+    }
+    .hidden {
+      display: none;
+    }
+    #readingInterface {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    #originalText {
+      background: white;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 20px;
+      line-height: 1.6;
+      font-size: 18px;
+      margin-bottom: 20px;
+      min-height: 100px;
+    }
+    .reading-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .timer {
+      font-size: 24px;
+      font-weight: bold;
+      color: #dc3545;
+      background: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 2px solid #dc3545;
+    }
+    .timer.warning {
+      color: #ffc107;
+      border-color: #ffc107;
+    }
+    .timer.danger {
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    #transcriptArea {
+      background: white;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 100px;
+      font-size: 16px;
+      line-height: 1.5;
+      margin: 20px 0;
+    }
+    .recording {
+      border-color: #dc3545 !important;
+      background: #fff5f5 !important;
+    }
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .result-card {
+      background: white;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+    .result-value {
+      font-size: 28px;
+      font-weight: bold;
+      color: #007cba;
+    }
+    .result-label {
+      font-size: 14px;
+      color: #666;
+      margin-top: 4px;
+    }
+    .comparison {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      font-family: monospace;
+      line-height: 2;
+      font-size: 16px;
+    }
+    .word-correct {
+      background: #d4edda;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin: 0 2px;
+    }
+    .word-error {
+      background: #f8d7da;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin: 0 2px;
+      text-decoration: line-through;
+    }
+    .word-missing {
+      background: #fff3cd;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin: 0 2px;
+    }
+    .word-extra {
+      background: #d1ecf1;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin: 0 2px;
+    }
+    .back-btn {
+      background: #6c757d;
+      margin-bottom: 20px;
+    }
+    .back-btn:hover {
+      background: #5a6268;
+    }
+    .recent-readings {
+      margin-top: 30px;
+    }
+    .reading-item {
+      background: white;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .reading-info h4 {
+      margin: 0 0 4px 0;
+      color: #333;
+    }
+    .reading-info .meta {
+      font-size: 12px;
+      color: #666;
+    }
+    .reading-stats {
+      text-align: right;
+      font-size: 14px;
+    }
+    .reading-stats .wpm {
+      font-weight: bold;
+      color: #007cba;
+    }
+    .reading-stats .errors {
+      color: #dc3545;
+      font-size: 12px;
+    }
+  </style>
+</head>
 <body>
-<h1>Student Panel</h1>
-<input type="text" id="student" placeholder="Your name">
-<button onclick="enter()">Enter</button>
-<div id="panel"></div>
-<script>
-function enter(){
-  document.getElementById("panel").innerText = "Welcome, "+student.value;
-}
-</script>
-</body></html>
+  <div class="container">
+    <!-- Giriş Ekranı -->
+    <div id="loginScreen" class="card">
+      <h1>🧒 Öğrenci Paneli</h1>
+      <p>Adını yazarak okuma alıştırmalarına başla!</p>
+      <div class="input-group">
+        <label for="studentName">Adın:</label>
+        <input type="text" id="studentName" placeholder="Örn: Ahmet Yılmaz" />
+      </div>
+      <button onclick="enterStudent()" id="enterBtn">Başla</button>
+    </div>
+
+    <!-- Ana Panel -->
+    <div id="mainPanel" class="hidden">
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h1 id="welcomeText">Hoş geldin!</h1>
+          <button onclick="logout()" class="btn-danger">Çıkış</button>
+        </div>
+      </div>
+
+      <!-- Metinler Listesi -->
+      <div id="textsSection" class="card">
+        <h2>📚 Okuma Metinleri</h2>
+        <p>Bir metin seç ve okuma alıştırmasına başla!</p>
+        <div id="textsGrid" class="text-grid">
+          <!-- Metinler buraya yüklenecek -->
+        </div>
+      </div>
+
+      <!-- Son Okumalar -->
+      <div id="recentSection" class="card recent-readings hidden">
+        <h2>📈 Son Okumalarım</h2>
+        <div id="recentReadings">
+          <!-- Son okumalar buraya yüklenecek -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Okuma Arayüzü -->
+    <div id="readingScreen" class="hidden">
+      <div class="card">
+        <button onclick="goBackToTexts()" class="back-btn">← Metinlere Dön</button>
+        <h2 id="readingTitle">Okuma Alıştırması</h2>
+        
+        <div id="readingInterface">
+          <h3>📖 Okuyacağın Metin:</h3>
+          <div id="originalText"></div>
+
+          <div class="reading-controls">
+            <div id="timer" class="timer">--:--</div>
+            <button id="startBtn" onclick="startReading()">🎤 Okumaya Başla</button>
+            <button id="stopBtn" onclick="stopReading()" class="btn-danger hidden">⏹️ Durdur</button>
+          </div>
+
+          <div id="recordingStatus" class="hidden">
+            <p style="text-align: center; color: #dc3545; font-weight: bold;">
+              🎤 Kayıt yapılıyor... Metni sesli okumaya başla!
+            </p>
+          </div>
+
+          <div>
+            <h3>🎙️ Senin Okuduğun:</h3>
+            <div id="transcriptArea">Henüz kayıt başlamadı...</div>
+          </div>
+        </div>
+
+        <!-- Sonuçlar -->
+        <div id="resultsSection" class="hidden">
+          <h2>📊 Sonuçların</h2>
+          
+          <div class="results-grid">
+            <div class="result-card">
+              <div id="wpmResult" class="result-value">0</div>
+              <div class="result-label">Kelime/Dakika</div>
+            </div>
+            <div class="result-card">
+              <div id="wordsResult" class="result-value">0</div>
+              <div class="result-label">Okunan Kelime</div>
+            </div>
+            <div class="result-card">
+              <div id="errorsResult" class="result-value">0</div>
+              <div class="result-label">Hata Sayısı</div>
+            </div>
+            <div class="result-card">
+              <div id="accuracyResult" class="result-value">0%</div>
+              <div class="result-label">Doğruluk</div>
+            </div>
+          </div>
+
+          <div>
+            <h3>🔍 Metin Karşılaştırması</h3>
+            <div id="comparisonArea" class="comparison"></div>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <button onclick="tryAgain()" class="btn-warning">🔄 Tekrar Dene</button>
+            <button onclick="goBackToTexts()" class="btn-success">✅ Tamamladım</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStudent = '';
+    let currentText = null;
+    let recognition = null;
+    let isRecording = false;
+    let startTime = null;
+    let timeLimit = 0;
+    let timerInterval = null;
+    let transcript = '';
+
+    // Giriş
+    function enterStudent() {
+      const name = document.getElementById('studentName').value.trim();
+      if (!name) {
+        alert('Lütfen adını gir!');
+        return;
+      }
+      
+      currentStudent = name;
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('mainPanel').classList.remove('hidden');
+      document.getElementById('welcomeText').textContent = `Hoş geldin, ${name}!`;
+      
+      loadTexts();
+      loadRecentReadings();
+    }
+
+    // Çıkış
+    function logout() {
+      currentStudent = '';
+      currentText = null;
+      transcript = '';
+      
+      document.getElementById('mainPanel').classList.add('hidden');
+      document.getElementById('readingScreen').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('studentName').value = '';
+      
+      if (recognition) {
+        recognition.stop();
+        recognition = null;
+      }
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+    }
+
+    // Metinleri yükle
+    async function loadTexts() {
+      try {
+        const response = await fetch(`/api/student/${encodeURIComponent(currentStudent)}/texts`);
+        const texts = await response.json();
+        
+        const grid = document.getElementById('textsGrid');
+        grid.innerHTML = '';
+        
+        if (texts.length === 0) {
+          grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: #666; padding: 40px;">Henüz metin eklenmemiş</p>';
+          return;
+        }
+
+        texts.forEach(text => {
+          const card = document.createElement('div');
+          card.className = `text-card ${text.total_attempts ? 'attempted' : ''}`;
+          card.onclick = () => selectText(text);
+          
+          let statsHtml = '';
+          if (text.total_attempts) {
+            statsHtml = `
+              <div class="text-stats">
+                <span class="stat-item stat-best">En İyi: ${text.best_wpm} k/dk</span>
+                <span class="stat-item stat-attempts">${text.total_attempts} deneme</span>
+                <div style="margin-top: 4px; font-size: 11px; color: #888;">
+                  Son: ${new Date(text.last_attempt).toLocaleDateString('tr-TR')}
+                </div>
+              </div>
+            `;
+          }
+          
+          card.innerHTML = `
+            <h3>${text.title}</h3>
+            <div class="text-meta">
+              <strong>Süre:</strong> ${text.duration_sec} saniye<br>
+              <strong>Kelime Sayısı:</strong> ~${text.content.split(' ').length} kelime
+            </div>
+            ${statsHtml}
+            ${text.total_attempts ? '<div style="margin-top: 8px; font-size: 12px; color: #28a745; font-weight: bold;">✅ Daha önce denemiş</div>' : '<div style="margin-top: 8px; font-size: 12px; color: #007cba; font-weight: bold;">🆕 Yeni</div>'}
+          `;
+          
+          grid.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Metinleri yükleme hatası:', error);
+      }
+    }
+
+    // Son okumaları yükle
+    async function loadRecentReadings() {
+      try {
+        const response = await fetch(`/api/student/${encodeURIComponent(currentStudent)}/readings`);
+        const readings = await response.json();
+        
+        if (readings.length === 0) {
+          document.getElementById('recentSection').classList.add('hidden');
+          return;
+        }
+
+        document.getElementById('recentSection').classList.remove('hidden');
+        const container = document.getElementById('recentReadings');
+        container.innerHTML = '';
+
+        readings.forEach(reading => {
+          const item = document.createElement('div');
+          item.className = 'reading-item';
+          
+          item.innerHTML = `
+            <div class="reading-info">
+              <h4>${reading.title}</h4>
+              <div class="meta">${new Date(reading.created_at).toLocaleDateString('tr-TR', {
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}</div>
+            </div>
+            <div class="reading-stats">
+              <div class="wpm">${reading.wpm} k/dk</div>
+              <div class="errors">${reading.errors} hata</div>
+            </div>
+          `;
+          
+          container.appendChild(item);
+        });
+      } catch (error) {
+        console.error('Son okumaları yükleme hatası:', error);
+      }
+    }
+
+    // Metin seçimi
+    async function selectText(text) {
+      currentText = text;
+      
+      document.getElementById('mainPanel').classList.add('hidden');
+      document.getElementById('readingScreen').classList.remove('hidden');
+      document.getElementById('readingTitle').textContent = text.title;
+      document.getElementById('originalText').textContent = text.content;
+      document.getElementById('transcriptArea').textContent = 'Henüz kayıt başlamadı...';
+      
+      // Sonuç bölümünü gizle
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('startBtn').classList.remove('hidden');
+      document.getElementById('stopBtn').classList.add('hidden');
+      document.getElementById('recordingStatus').classList.add('hidden');
+      
+      timeLimit = text.duration_sec;
+      transcript = '';
+      
+      // Timer'ı sıfırla
+      updateTimer(timeLimit);
+    }
+
+    // Metinlere dön
+    function goBackToTexts() {
+      if (recognition) {
+        recognition.stop();
+        recognition = null;
+      }
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+      
+      document.getElementById('readingScreen').classList.add('hidden');
+      document.getElementById('mainPanel').classList.remove('hidden');
+      
+      // Yeniden yükle (güncel veriler için)
+      loadTexts();
+      loadRecentReadings();
+    }
+
+    // Okumaya başla
+    function startReading() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Tarayıcın ses tanıma özelliğini desteklemiyor. Chrome veya Edge kullanmayı dene.');
+        return;
+      }
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'tr-TR';
+
+      let finalTranscript = '';
+      
+      recognition.onstart = () => {
+        isRecording = true;
+        startTime = Date.now();
+        document.getElementById('startBtn').classList.add('hidden');
+        document.getElementById('stopBtn').classList.remove('hidden');
+        document.getElementById('recordingStatus').classList.remove('hidden');
+        document.getElementById('transcriptArea').classList.add('recording');
+        
+        startTimer();
+      };
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        transcript = finalTranscript + interimTranscript;
+        document.getElementById('transcriptArea').textContent = transcript || 'Dinleniyor...';
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Ses tanıma hatası:', event.error);
+        stopReading();
+      };
+
+      recognition.onend = () => {
+        if (isRecording) {
+          // Süre bitmeden durdu, tekrar başlat
+          recognition.start();
+        }
+      };
+
+      recognition.start();
+    }
+
+    // Okumayı durdur
+    function stopReading() {
+      isRecording = false;
+      
+      if (recognition) {
+        recognition.stop();
+        recognition = null;
+      }
+      
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+      
+      document.getElementById('startBtn').classList.remove('hidden');
+      document.getElementById('stopBtn').classList.add('hidden');
+      document.getElementById('recordingStatus').classList.add('hidden');
+      document.getElementById('transcriptArea').classList.remove('recording');
+      
+      // Sonuçları hesapla
+      calculateResults();
+    }
+
+    // Timer başlat
+    function startTimer() {
+      let remaining = timeLimit;
+      
+      timerInterval = setInterval(() => {
+        remaining--;
+        updateTimer(remaining);
+        
+        if (remaining <= 10) {
+          document.getElementById('timer').classList.add('danger');
+        } else if (remaining <= 30) {
+          document.getElementById('timer').classList.add('warning');
+        }
+        
+        if (remaining <= 0) {
+          stopReading();
+        }
+      }, 1000);
+    }
+
+    // Timer güncelle
+    function updateTimer(seconds) {
+      const minutes = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      document.getElementById('timer').textContent = 
+        `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      
+      // Renk sınıflarını temizle
+      const timer = document.getElementById('timer');
+      timer.classList.remove('warning', 'danger');
+    }
+
+    // Sonuçları hesapla
+    function calculateResults() {
+      if (!currentText || !transcript.trim()) {
+        alert('Okuma kaydedilmedi. Lütfen tekrar dene.');
+        return;
+      }
+
+      const readingTime = (Date.now() - startTime) / 1000; // saniye
+      const originalWords = currentText.content.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+      const spokenWords = transcript.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+      
+      // WPM hesapla
+      const wpm = Math.round((spokenWords.length / readingTime) * 60);
+      
+      // Hata analizi
+      const errors = calculateErrors(originalWords, spokenWords);
+      const wordsRead = spokenWords.length;
+      const accuracy = wordsRead > 0 ? Math.round(((wordsRead - errors) / wordsRead) * 100) : 0;
+      
+      // Sonuçları göster
+      document.getElementById('wpmResult').textContent = wpm;
+      document.getElementById('wordsResult').textContent = wordsRead;
+      document.getElementById('errorsResult').textContent = errors;
+      document.getElementById('accuracyResult').textContent = accuracy + '%';
+      
+      // Karşılaştırma
+      const comparison = createComparison(originalWords, spokenWords);
+      document.getElementById('comparisonArea').innerHTML = comparison;
+      
+      // Sonuç bölümünü göster
+      document.getElementById('resultsSection').classList.remove('hidden');
+      
+      // Sonucu kaydet
+      saveReading({
+        student_name: currentStudent,
+        text_id: currentText.id,
+        transcript: transcript.trim(),
+        words_read: wordsRead,
+        errors: errors,
+        wpm: wpm,
+        detail_html: comparison
+      });
+    }
+
+    // Hata hesaplama
+    function calculateErrors(original, spoken) {
+      let errors = 0;
+      const maxLen = Math.max(original.length, spoken.length);
+      
+      for (let i = 0; i < maxLen; i++) {
+        if (i >= original.length || i >= spoken.length) {
+          errors++; // Eksik veya fazla kelime
+        } else if (original[i] !== spoken[i]) {
+          errors++; // Yanlış kelime
+        }
+      }
+      
+      return errors;
+    }
+
+    // Metin karşılaştırması oluştur
+    function createComparison(original, spoken) {
+      let html = '';
+      const maxLen = Math.max(original.length, spoken.length);
+      
+      for (let i = 0; i < maxLen; i++) {
+        if (i >= original.length) {
+          // Fazla kelime
+          html += `<span class="word-extra">${spoken[i]}</span> `;
+        } else if (i >= spoken.length) {
+          // Eksik kelime
+          html += `<span class="word-missing">${original[i]}</span> `;
+        } else if (original[i] === spoken[i]) {
+          // Doğru kelime
+          html += `<span class="word-correct">${original[i]}</span> `;
+        } else {
+          // Yanlış kelime
+          html += `<span class="word-error">${spoken[i]}</span> `;
+        }
+      }
+      
+      return html;
+    }
+
+    // Sonucu kaydet
+    async function saveReading(data) {
+      try {
+        const response = await fetch('/api/readings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        console.log('Okuma kaydedildi:', result);
+      } catch (error) {
+        console.error('Kaydetme hatası:', error);
+      }
+    }
+
+    // Tekrar dene
+    function tryAgain() {
+      // Sonuç bölümünü gizle ve başa dön
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('transcriptArea').textContent = 'Henüz kayıt başlamadı...';
+      transcript = '';
+      updateTimer(timeLimit);
+      
+      // Timer sınıflarını temizle
+      const timer = document.getElementById('timer');
+      timer.classList.remove('warning', 'danger');
+    }
+
+    // Sayfa yüklendiğinde
+    document.addEventListener('DOMContentLoaded', function() {
+      // Enter tuşu ile giriş
+      document.getElementById('studentName').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          enterStudent();
+        }
+      });
+      
+      // Tarayıcı desteği kontrolü
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        console.warn('Bu tarayıcı ses tanıma özelliğini desteklemiyor.');
+      }
+    });
+  </script>
+</body>
+</html>

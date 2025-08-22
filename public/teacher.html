@@ -1,22 +1,427 @@
-<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Teacher Panel</title></head>
-<body>
-<h1>Teacher Panel</h1>
-<form id="loginForm">
-  <input type="text" id="username" placeholder="Username">
-  <input type="password" id="password" placeholder="Password">
-  <button type="submit">Login</button>
-</form>
-<div id="panel"></div>
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Öğretmen</title><style>
+body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#f5f5f5}
+.container{max-width:1200px;margin:0 auto}
+.card{background:white;padding:20px;margin-bottom:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+.card h1,.card h2{margin-top:0}
+.card > div{margin:10px 0}
+label{display:block;margin-bottom:5px;font-weight:bold}
+input,textarea{width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box}
+textarea{height:80px}
+button{background:#007cba;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer}
+button:hover{background:#005a87}
+.del{background:#dc3545}
+.del:hover{background:#c82333}
+.small{color:#666;font-size:12px}
+#msg{margin-left:10px;color:red}
+.student-link{color:#007cba;text-decoration:none;cursor:pointer}
+.student-link:hover{text-decoration:underline}
+.text-link{color:#28a745;text-decoration:none;cursor:pointer;font-weight:bold}
+.text-link:hover{text-decoration:underline}
+.stat-card{background:#f8f9fa;padding:12px;border-radius:6px;text-align:center;border:1px solid #e9ecef}
+.stat-number{font-size:20px;font-weight:bold;color:#007cba}
+.stat-label{font-size:11px;color:#666;margin-top:4px}
+</style></head><body><div class="container"><div class="card"><h1>Öğretmen Paneli</h1><p class="small">Varsayılan: ogretmen / Etathlon!</p><div><label>Kullanıcı</label><input id="username" value="ogretmen"></div><div><label>Şifre</label><input id="password" type="password" value="Etathlon!2025"></div><div style="margin-top:8px"><button id="loginBtn">Giriş</button><span id="msg"></span></div></div><div id="panel" style="display:none"></div></div>
+
+<!-- Student Modal -->
+<div id="studentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:9999;">
+  <div id="studentModalContent" style="background:#fff;padding:24px;border-radius:12px;max-width:720px;width:92%;max-height:80vh;overflow:auto;position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 id="studentModalTitle" style="margin:0"></h3>
+      <button id="studentModalClose" style="font-size:24px;border:none;background:transparent;cursor:pointer;padding:4px;line-height:1;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:4px">×</button>
+    </div>
+    <div id="studentModalBody"></div>
+  </div>
+</div>
+
+<!-- Text Students Modal -->
+<div id="textModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:9999;">
+  <div id="textModalContent" style="background:#fff;padding:24px;border-radius:12px;max-width:800px;width:92%;max-height:80vh;overflow:auto;position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 id="textModalTitle" style="margin:0"></h3>
+      <button id="textModalClose" style="font-size:24px;border:none;background:transparent;cursor:pointer;padding:4px;line-height:1;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:4px">×</button>
+    </div>
+    <div id="textModalBody"></div>
+  </div>
+</div>
+
 <script>
-document.getElementById("loginForm").onsubmit = async (e)=>{
-  e.preventDefault();
-  const res = await fetch("/api/auth/login",{
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({username:username.value,password:password.value})
-  });
-  const data = await res.json();
-  document.getElementById("panel").innerText = JSON.stringify(data);
+// Modal değişkenleri
+const studentModal = document.getElementById('studentModal');
+const studentModalClose = document.getElementById('studentModalClose');
+const studentModalContent = document.getElementById('studentModalContent');
+
+const textModal = document.getElementById('textModal');
+const textModalClose = document.getElementById('textModalClose');
+const textModalContent = document.getElementById('textModalContent');
+
+let token = null; // localStorage kullanımı kaldırıldı
+
+function hdr(){
+  return token ? {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + token
+  } : {
+    'Content-Type': 'application/json'
+  };
 }
+
+async function login(){
+  const u = document.getElementById('username').value.trim();
+  const p = document.getElementById('password').value.trim();
+  
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username: u, password: p})
+    });
+    
+    const d = await r.json();
+    
+    if(d.token){
+      token = d.token;
+      document.querySelector('.card').style.display = 'none';
+      loadPanel();
+    } else {
+      document.getElementById('msg').textContent = d.error || 'Giriş hatası';
+    }
+  } catch(error) {
+    document.getElementById('msg').textContent = 'Bağlantı hatası';
+  }
+}
+
+document.getElementById('loginBtn').addEventListener('click', login);
+
+async function loadPanel(){
+  document.getElementById('panel').style.display = 'block';
+  document.getElementById('panel').innerHTML = `
+    <div class='card'>
+      <h2>Metin Ekle</h2>
+      <div><label>Başlık</label><input id='title'></div>
+      <div><label>Süre</label><input id='duration' type='number' value='60'></div>
+      <div><label>Metin</label><textarea id='content'></textarea></div>
+      <div style='margin-top:8px'><button id='saveText'>Kaydet</button></div>
+    </div>
+    <div class='card'>
+      <h2>Metinler</h2>
+      <div id='texts'></div>
+    </div>
+    <div class='card'>
+      <h2>Okumalar</h2>
+      <div id='readings'></div>
+    </div>
+  `;
+  
+  document.getElementById('saveText').addEventListener('click', async () => {
+    const title = document.getElementById('title').value.trim();
+    const content = document.getElementById('content').value.trim();
+    const duration = parseInt(document.getElementById('duration').value, 10);
+    
+    if(!title || !content || !duration) {
+      alert('Lütfen tüm alanları doldurun');
+      return;
+    }
+    
+    try {
+      await fetch('/api/texts', {
+        method: 'POST',
+        headers: hdr(),
+        body: JSON.stringify({title, content, duration_sec: duration})
+      });
+      
+      // Formu temizle
+      document.getElementById('title').value = '';
+      document.getElementById('content').value = '';
+      document.getElementById('duration').value = '60';
+      
+      loadTexts();
+    } catch(error) {
+      alert('Kaydetme hatası');
+    }
+  });
+  
+  loadTexts();
+  loadReadings();
+}
+
+async function loadTexts(){
+  try {
+    const r = await fetch('/api/texts');
+    const rows = await r.json();
+    const wrap = document.getElementById('texts');
+    
+    if (!wrap) return;
+    
+    wrap.innerHTML = '';
+    
+    if(rows.length === 0) {
+      wrap.innerHTML = '<p style="color:#666;text-align:center;padding:20px;">Henüz metin eklenmemiş</p>';
+      return;
+    }
+    
+    rows.forEach(x => {
+      const div = document.createElement('div');
+      div.style.display = 'flex';
+      div.style.justifyContent = 'space-between';
+      div.style.alignItems = 'center';
+      div.style.padding = '12px 0';
+      div.style.borderBottom = '1px solid #eee';
+      div.innerHTML = `
+        <div>
+          <a href="#" class="text-link" data-text-id="${x.id}" data-text-title="${x.title}">
+            ${x.title}
+          </a>
+          <span class='small' style="margin-left:8px">${x.duration_sec} sn</span>
+          <div class="small" style="margin-top:4px;color:#888">
+            ${new Date(x.created_at).toLocaleDateString('tr-TR')}
+          </div>
+        </div>
+        <div>
+          <button data-id='${x.id}' class='del'>Sil</button>
+        </div>
+      `;
+      wrap.appendChild(div);
+    });
+    
+    // Silme butonları için event listener
+    document.querySelectorAll('.del').forEach(b => 
+      b.addEventListener('click', async e => {
+        if(!confirm('Bu metni silmek istediğinizden emin misiniz?')) return;
+        
+        try {
+          await fetch('/api/texts/' + e.target.dataset.id, {
+            method: 'DELETE',
+            headers: hdr()
+          });
+          
+          loadTexts();
+          loadReadings();
+        } catch(error) {
+          alert('Silme hatası');
+        }
+      })
+    );
+  } catch(error) {
+    console.error('Metin yükleme hatası:', error);
+  }
+}
+
+async function loadReadings(){
+  try {
+    const r = await fetch('/api/readings');
+    const rows = await r.json();
+    const wrap = document.getElementById('readings');
+    
+    if (!wrap) return;
+    
+    wrap.innerHTML = '';
+    
+    if(rows.length === 0) {
+      wrap.innerHTML = '<p style="color:#666;text-align:center;padding:20px;">Henüz okuma yapılmamış</p>';
+      return;
+    }
+    
+    rows.forEach(rw => {
+      const div = document.createElement('div');
+      div.style.padding = '8px 0';
+      div.style.borderBottom = '1px solid #eee';
+      div.innerHTML = `
+        <div style='display:flex;justify-content:space-between;align-items:center'>
+          <div>
+            <strong>
+              <a href="#" class="student-link" data-name="${rw.student_name}">
+                ${rw.student_name}
+              </a>
+            </strong> 
+            — <span class="text-link" style="cursor:default;text-decoration:none">${rw.title}</span>
+            <span class='small'>${rw.wpm} k/dk • ${rw.errors} hata</span>
+          </div>
+          <div>
+            <a href='reading_detail.html?id=${rw.id}'>
+              <button>Detay</button>
+            </a>
+          </div>
+        </div>
+      `;
+      wrap.appendChild(div);
+    });
+  } catch(error) {
+    console.error('Okuma verilerini yükleme hatası:', error);
+  }
+}
+
+// Modal kapatma fonksiyonları
+function closeStudentModal() {
+  studentModal.style.display = 'none';
+  document.getElementById('studentModalBody').innerHTML = '';
+}
+
+function closeTextModal() {
+  textModal.style.display = 'none';
+  document.getElementById('textModalBody').innerHTML = '';
+}
+
+// Student Modal event listener'ları
+studentModalClose.addEventListener('click', closeStudentModal);
+studentModal.addEventListener('click', function(e) {
+  if (e.target === studentModal) {
+    closeStudentModal();
+  }
+});
+studentModalContent.addEventListener('click', function(e) {
+  e.stopPropagation();
+});
+
+// Text Modal event listener'ları
+textModalClose.addEventListener('click', closeTextModal);
+textModal.addEventListener('click', function(e) {
+  if (e.target === textModal) {
+    closeTextModal();
+  }
+});
+textModalContent.addEventListener('click', function(e) {
+  e.stopPropagation();
+});
+
+// ESC tuşu ile kapatma
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (studentModal.style.display === 'flex') {
+      closeStudentModal();
+    }
+    if (textModal.style.display === 'flex') {
+      closeTextModal();
+    }
+  }
+});
+
+// Global click event listener
+document.addEventListener('click', async function(e){
+  // Öğrenci linkine tıklama
+  const studentLink = e.target.closest('.student-link');
+  if(studentLink){ 
+    e.preventDefault();
+    
+    const name = studentLink.dataset.name;
+    
+    // Loading state
+    document.getElementById('studentModalTitle').textContent = 'Yükleniyor...';
+    document.getElementById('studentModalBody').innerHTML = '<div style="text-align:center;padding:20px">Veriler yükleniyor...</div>';
+    studentModal.style.display = 'flex';
+    
+    try {
+      // Haftalık-aylık istatistikleri getir
+      const res = await fetch('/api/student/' + encodeURIComponent(name) + '/weekly-monthly');
+      const d = await res.json();
+      
+      const w = d.weekly || {};
+      const m = d.monthly || {};
+      
+      const body = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+          <div class="stat-card">
+            <div class="stat-number">${w.readings || 0}</div>
+            <div class="stat-label">Haftalık Okuma</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">${m.readings || 0}</div>
+            <div class="stat-label">Aylık Okuma</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">${w.total_words || 0}</div>
+            <div class="stat-label">Haftalık Kelime</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">${m.total_words || 0}</div>
+            <div class="stat-label">Aylık Kelime</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">${Number(w.avg_wpm || 0).toFixed(1)}</div>
+            <div class="stat-label">Haftalık Ort. WPM</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">${Number(m.avg_wpm || 0).toFixed(1)}</div>
+            <div class="stat-label">Aylık Ort. WPM</div>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('studentModalTitle').textContent = 'Öğrenci İstatistikleri — ' + name;
+      document.getElementById('studentModalBody').innerHTML = body;
+      
+    } catch(error) {
+      document.getElementById('studentModalTitle').textContent = 'Hata';
+      document.getElementById('studentModalBody').innerHTML = '<div style="text-align:center;padding:20px;color:red">Veriler yüklenirken hata oluştu</div>';
+    }
+  }
+
+  // Metin linkine tıklama
+  const textLink = e.target.closest('.text-link');
+  if(textLink && textLink.dataset.textId){ 
+    e.preventDefault();
+    
+    const textId = textLink.dataset.textId;
+    const textTitle = textLink.dataset.textTitle;
+    
+    // Loading state
+    document.getElementById('textModalTitle').textContent = 'Yükleniyor...';
+    document.getElementById('textModalBody').innerHTML = '<div style="text-align:center;padding:20px">Veriler yükleniyor...</div>';
+    textModal.style.display = 'flex';
+    
+    try {
+      // Bu metni okuyan öğrencileri getir
+      const res = await fetch('/api/text/' + textId + '/students');
+      const students = await res.json();
+      
+      let body = '';
+      
+      if(students.length === 0) {
+        body = '<div style="text-align:center;padding:40px;color:#666">Bu metni henüz hiç kimse okumamış</div>';
+      } else {
+        body = `
+          <div style="margin-bottom:16px">
+            <strong>${students.length}</strong> öğrenci bu metni okumuş
+          </div>
+          <div style="display:grid;gap:12px">
+        `;
+        
+        students.forEach((student, index) => {
+          const rankColor = index === 0 ? '#28a745' : index === 1 ? '#ffc107' : index === 2 ? '#fd7e14' : '#6c757d';
+          const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+          
+          body += `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid ${rankColor}">
+              <div>
+                <div style="font-weight:bold;color:${rankColor}">
+                  ${rankIcon} 
+                  <a href="#" class="student-link" data-name="${student.student_name}" style="color:${rankColor}">
+                    ${student.student_name}
+                  </a>
+                </div>
+                <div style="font-size:12px;color:#666;margin-top:4px">
+                  ${student.total_attempts} deneme • Son: ${new Date(student.last_attempt).toLocaleDateString('tr-TR')}
+                </div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-weight:bold;color:${rankColor}">${student.best_wpm} k/dk</div>
+                <div style="font-size:12px;color:#666">${student.best_errors} hata</div>
+              </div>
+            </div>
+          `;
+        });
+        
+        body += '</div>';
+      }
+      
+      document.getElementById('textModalTitle').textContent = textTitle + ' — Öğrenci Listesi';
+      document.getElementById('textModalBody').innerHTML = body;
+      
+    } catch(error) {
+      document.getElementById('textModalTitle').textContent = 'Hata';
+      document.getElementById('textModalBody').innerHTML = '<div style="text-align:center;padding:20px;color:red">Veriler yüklenirken hata oluştu</div>';
+    }
+  }
+});
 </script>
+
 </body></html>
