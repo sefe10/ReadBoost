@@ -80,7 +80,238 @@ app.post("/api/auth/login",(req,res)=>{
   });
 });
 
-// (metin ekleme, listeleme, silme; okuma gönderme, listeleme; öğrenci metin+durum sorgusu)
-// Burada ayrıntılı API uçları tanımlanacak (kısaltıldı)
+// Metin ekleme
+app.post("/api/texts", auth, (req, res) => {
+  const {title, content, duration_sec} = req.body;
+  if(!title || !content || !duration_sec) {
+    return res.status(400).json({error: "Missing fields"});
+  }
+
+  db.run("INSERT INTO texts (title, content, duration_sec) VALUES (?,?,?)", 
+    [title, content, duration_sec], 
+    function(err) {
+      if(err) return res.status(500).json({error: err.message});
+      res.json({id: this.lastID});
+    }
+  );
+});
+
+// Metinleri listeleme
+app.get("/api/texts", (req, res) => {
+  db.all("SELECT * FROM texts ORDER BY created_at DESC", (err, rows) => {
+    if(err) return res.status(500).json({error: err.message});
+    res.json(rows);
+  });
+});
+
+// Metin silme
+app.delete("/api/texts/:id", auth, (req, res) => {
+  const id = req.params.id;
+  db.run("DELETE FROM texts WHERE id = ?", [id], function(err) {
+    if(err) return res.status(500).json({error: err.message});
+    // İlgili okumaları da sil
+    db.run("DELETE FROM readings WHERE text_id = ?", [id], (err) => {
+      if(err) console.error("Error deleting related readings:", err);
+    });
+    res.json({deleted: this.changes});
+  });
+});
+
+// Okumaları listeleme (en son okumalar)
+app.get("/api/readings", (req, res) => {
+  const query = `
+    SELECT r.*, t.title, t.content, t.duration_sec
+    FROM readings r
+    JOIN texts t ON r.text_id = t.id
+    ORDER BY r.created_at DESC
+  `;
+  db.all(query, (err, rows) => {
+    if(err) return res.status(500).json({error: err.message});
+    res.json(rows);
+  });
+});
+
+// Okuma detayı
+app.get("/api/reading/:id/detail", (req, res) => {
+  const id = req.params.id;
+  const query = `
+    SELECT r.*, t.title, t.content
+    FROM readings r
+    JOIN texts t ON r.text_id = t.id
+    WHERE r.id = ?
+  `;
+  db.get(query, [id], (err, row) => {
+    if(err) return res.status(500).json({error: err.message});
+    if(!row) return res.status(404).json({error: "Reading not found"});
+    res.json(row);
+  });
+});
+
+// Öğrenci haftalık/aylık istatistikleri
+app.get("/api/student/:name/weekly-monthly", (req, res) => {
+  const name = req.params.name;
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const monthAgo = new Date();
+  monthAgo.setDate(monthAgo.getDate() - 30);
+
+  // Haftalık veriler
+  const weeklyQuery = `
+    SELECT 
+      COUNT(*) as readings,
+      SUM(words_read) as total_words,
+      AVG(wpm) as avg_wpm
+    FROM readings 
+    WHERE student_name = ? AND created_at >= ?
+  `;
+
+  // Aylık veriler
+  const monthlyQuery = `
+    SELECT 
+      COUNT(*) as readings,
+      SUM(words_read) as total_words,
+      AVG(wpm) as avg_wpm
+    FROM readings 
+    WHERE student_name = ? AND created_at >= ?
+  `;
+
+  db.get(weeklyQuery, [name, weekAgo.toISOString()], (err, weekly) => {
+    if(err) return res.status(500).json({error: err.message});
+
+    db.get(monthlyQuery, [name, monthAgo.toISOString()], (err, monthly) => {
+      if(err) return res.status(500).json({error: err.message});
+
+      res.json({
+        weekly: weekly || {},
+        monthly: monthly || {}
+      });
+    });
+  });
+});
+
+// YENİ: Belirli bir metni okuyan öğrencilerin listesi
+app.get("/api/text/:textId/students", (req, res) => {
+  const textId = req.params.textId;
+
+  const query = `
+    SELECT 
+      r.student_name,
+      r.wpm,
+      r.errors,
+      r.words_read,
+      r.created_at,
+      r.id as reading_id,
+      COUNT(r.student_name) as reading_count
+    FROM readings r
+    WHERE r.text_id = ?
+    GROUP BY r.student_name
+    ORDER BY r.wpm DESC, r.created_at DESC
+  `;
+
+  db.all(query, [textId], (err, rows) => {
+    if(err) return res.status(500).json({error: err.message});
+
+    // Her öğrenci için en iyi performansı al
+    const detailedQuery = `
+      SELECT 
+        r.student_name,
+        MAX(r.wpm) as best_wpm,
+        MIN(r.errors) as best_errors,
+        COUNT(*) as total_attempts,
+        MAX(r.created_at) as last_attempt,
+        r.id as best_reading_id
+      FROM readings r
+      WHERE r.text_id = ?
+      GROUP BY r.student_name
+      ORDER BY best_wpm DESC, last_attempt DESC
+    `;
+
+    db.all(detailedQuery, [textId], (err, detailedRows) => {
+      if(err) return res.status(500).json({error: err.message});
+      res.json(detailedRows);
+    });
+  });
+});
+
+// Okuma kaydetme (öğrenci tarafından kullanılacak)
+app.post("/api/readings", (req, res) => {
+  const {student_name, text_id, transcript, words_read, errors, wpm, detail_html} = req.body;
+
+  if(!student_name || !text_id || !transcript) {
+    return res.status(400).json({error: "Missing required fields"});
+  }
+
+  db.run(`INSERT INTO readings 
+    (student_name, text_id, transcript, words_read, errors, wpm, detail_html) 
+    VALUES (?,?,?,?,?,?,?)`, 
+    [student_name, text_id, transcript, words_read||0, errors||0, wpm||0, detail_html||''],
+    function(err) {
+      if(err) return res.status(500).json({error: err.message});
+      res.json({id: this.lastID});
+    }
+  );
+});
+
+// YENİ: Öğrenci için metinleri getir (önceki deneme bilgisiyle birlikte)
+app.get("/api/student/:name/texts", (req, res) => {
+  const studentName = req.params.name;
+
+  const query = `
+    SELECT 
+      t.*,
+      r.best_wpm,
+      r.best_errors,
+      r.total_attempts,
+      r.last_attempt
+    FROM texts t
+    LEFT JOIN (
+      SELECT 
+        text_id,
+        MAX(wpm) as best_wpm,
+        MIN(errors) as best_errors,
+        COUNT(*) as total_attempts,
+        MAX(created_at) as last_attempt
+      FROM readings 
+      WHERE student_name = ?
+      GROUP BY text_id
+    ) r ON t.id = r.text_id
+    ORDER BY t.created_at DESC
+  `;
+
+  db.all(query, [studentName], (err, rows) => {
+    if(err) return res.status(500).json({error: err.message});
+    res.json(rows);
+  });
+});
+
+// YENİ: Öğrenci için tek bir metin detayı getir
+app.get("/api/text/:id", (req, res) => {
+  const textId = req.params.id;
+
+  db.get("SELECT * FROM texts WHERE id = ?", [textId], (err, row) => {
+    if(err) return res.status(500).json({error: err.message});
+    if(!row) return res.status(404).json({error: "Text not found"});
+    res.json(row);
+  });
+});
+
+// YENİ: Öğrenci için okuma geçmişini getir
+app.get("/api/student/:name/readings", (req, res) => {
+  const studentName = req.params.name;
+
+  const query = `
+    SELECT r.*, t.title
+    FROM readings r
+    JOIN texts t ON r.text_id = t.id
+    WHERE r.student_name = ?
+    ORDER BY r.created_at DESC
+    LIMIT 10
+  `;
+
+  db.all(query, [studentName], (err, rows) => {
+    if(err) return res.status(500).json({error: err.message});
+    res.json(rows);
+  });
+});
 
 app.listen(PORT, ()=>console.log("Server running at http://localhost:"+PORT));
