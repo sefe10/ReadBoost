@@ -221,34 +221,45 @@
       border-radius: 8px;
       padding: 20px;
       margin: 20px 0;
-      font-family: monospace;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       line-height: 2;
       font-size: 16px;
+      border: 2px solid #e9ecef;
     }
     .word-correct {
       background: #d4edda;
+      color: #155724;
       padding: 2px 4px;
       border-radius: 4px;
       margin: 0 2px;
+      border: 1px solid #c3e6cb;
     }
     .word-error {
       background: #f8d7da;
+      color: #721c24;
       padding: 2px 4px;
       border-radius: 4px;
       margin: 0 2px;
       text-decoration: line-through;
+      border: 1px solid #f5c6cb;
     }
     .word-missing {
       background: #fff3cd;
+      color: #856404;
       padding: 2px 4px;
       border-radius: 4px;
       margin: 0 2px;
+      border: 1px solid #ffeaa7;
+      font-style: italic;
     }
     .word-extra {
       background: #d1ecf1;
+      color: #0c5460;
       padding: 2px 4px;
       border-radius: 4px;
       margin: 0 2px;
+      border: 1px solid #b6d7e2;
+      font-weight: bold;
     }
     .back-btn {
       background: #6c757d;
@@ -406,6 +417,241 @@
     let timeLimit = 0;
     let timerInterval = null;
     let transcript = '';
+
+    // Metni normalize etme fonksiyonu
+    function normalizeText(text) {
+      return text
+        .toLowerCase() // Büyük-küçük harf duyarsız
+        .replace(/[^\w\sğüşıöçĞÜŞIÖÇ]/g, ' ') // Noktalama işaretlerini boşluk yap
+        .replace(/\s+/g, ' ') // Çoklu boşlukları tek boşluk yap
+        .trim() // Başındaki ve sonundaki boşlukları temizle
+        .split(' ') // Kelimelere ayır
+        .filter(word => word.length > 0); // Boş kelimeleri filtrele
+    }
+
+    // Gelişmiş hata hesaplama
+    function calculateErrors(originalWords, spokenWords) {
+      let errors = 0;
+      let skippedWords = [];
+      let duplicateWords = [];
+      
+      let originalIndex = 0;
+      let spokenIndex = 0;
+      
+      while (originalIndex < originalWords.length || spokenIndex < spokenWords.length) {
+        // Orijinal metin bitti ama konuşma devam ediyor (fazla kelime)
+        if (originalIndex >= originalWords.length) {
+          errors++;
+          duplicateWords.push({
+            word: spokenWords[spokenIndex],
+            position: spokenIndex,
+            type: 'extra'
+          });
+          spokenIndex++;
+          continue;
+        }
+        
+        // Konuşma bitti ama orijinal metin devam ediyor (atlanan kelime)
+        if (spokenIndex >= spokenWords.length) {
+          errors++;
+          skippedWords.push({
+            word: originalWords[originalIndex],
+            position: originalIndex,
+            type: 'skipped'
+          });
+          originalIndex++;
+          continue;
+        }
+        
+        // Mevcut kelimeler eşleşiyor
+        if (originalWords[originalIndex] === spokenWords[spokenIndex]) {
+          originalIndex++;
+          spokenIndex++;
+          continue;
+        }
+        
+        // Kelimeler eşleşmiyor - hangi durumda olduğumuzu anlayalım
+        
+        // 1. Öğrenci bir sonraki kelimeyi söylemiş olabilir (atlama)
+        let foundSkipped = false;
+        for (let lookAhead = 1; lookAhead <= Math.min(3, originalWords.length - originalIndex); lookAhead++) {
+          if (originalWords[originalIndex + lookAhead] === spokenWords[spokenIndex]) {
+            // Atlanan kelimeleri kaydet
+            for (let i = 0; i < lookAhead; i++) {
+              errors++;
+              skippedWords.push({
+                word: originalWords[originalIndex + i],
+                position: originalIndex + i,
+                type: 'skipped'
+              });
+            }
+            originalIndex += lookAhead;
+            foundSkipped = true;
+            break;
+          }
+        }
+        
+        if (foundSkipped) continue;
+        
+        // 2. Öğrenci aynı kelimeyi tekrar söylemiş olabilir (çift okuma)
+        let foundDuplicate = false;
+        if (spokenIndex > 0 && spokenWords[spokenIndex] === spokenWords[spokenIndex - 1]) {
+          // Önceki kelime ile aynı - çift okuma
+          errors++;
+          duplicateWords.push({
+            word: spokenWords[spokenIndex],
+            position: spokenIndex,
+            type: 'duplicate'
+          });
+          spokenIndex++;
+          foundDuplicate = true;
+        }
+        
+        if (foundDuplicate) continue;
+        
+        // 3. Öğrenci ilerideki bir kelimeyi söylemiş olabilir
+        let foundAhead = false;
+        for (let lookAhead = 1; lookAhead <= Math.min(3, spokenWords.length - spokenIndex); lookAhead++) {
+          if (originalWords[originalIndex] === spokenWords[spokenIndex + lookAhead]) {
+            // Fazla kelimeleri kaydet
+            for (let i = 0; i < lookAhead; i++) {
+              errors++;
+              duplicateWords.push({
+                word: spokenWords[spokenIndex + i],
+                position: spokenIndex + i,
+                type: 'extra'
+              });
+            }
+            spokenIndex += lookAhead;
+            foundAhead = true;
+            break;
+          }
+        }
+        
+        if (foundAhead) continue;
+        
+        // 4. Basit kelime hatası
+        errors++;
+        originalIndex++;
+        spokenIndex++;
+      }
+      
+      return {
+        total: errors,
+        skipped: skippedWords,
+        duplicates: duplicateWords
+      };
+    }
+
+    // Gelişmiş metin karşılaştırması oluştur
+    function createComparison(originalWords, spokenWords) {
+      let html = '';
+      let originalIndex = 0;
+      let spokenIndex = 0;
+      
+      const errorInfo = calculateErrors(originalWords, spokenWords);
+      
+      // Hata raporunu HTML'e ekle
+      if (errorInfo.skipped.length > 0 || errorInfo.duplicates.length > 0) {
+        html += '<div style="background:#fff3cd;padding:10px;margin:10px 0;border-radius:5px;border-left:4px solid #ffc107;">';
+        html += '<strong>🔍 Tespit Edilen Hatalar:</strong><br>';
+        
+        if (errorInfo.skipped.length > 0) {
+          html += `<span style="color:#dc3545">📝 Atlanan kelimeler (${errorInfo.skipped.length}): `;
+          html += errorInfo.skipped.map(item => `<strong>${item.word}</strong>`).join(', ');
+          html += '</span><br>';
+        }
+        
+        if (errorInfo.duplicates.length > 0) {
+          const duplicates = errorInfo.duplicates.filter(item => item.type === 'duplicate');
+          const extras = errorInfo.duplicates.filter(item => item.type === 'extra');
+          
+          if (duplicates.length > 0) {
+            html += `<span style="color:#007bff">🔄 Çift okunan kelimeler (${duplicates.length}): `;
+            html += duplicates.map(item => `<strong>${item.word}</strong>`).join(', ');
+            html += '</span><br>';
+          }
+          
+          if (extras.length > 0) {
+            html += `<span style="color:#6610f2">➕ Fazla kelimeler (${extras.length}): `;
+            html += extras.map(item => `<strong>${item.word}</strong>`).join(', ');
+            html += '</span><br>';
+          }
+        }
+        
+        html += '</div>';
+      }
+      
+      // Kelime kelime karşılaştırma
+      html += '<div style="line-height:2;font-size:16px;">';
+      
+      while (originalIndex < originalWords.length || spokenIndex < spokenWords.length) {
+        if (originalIndex >= originalWords.length) {
+          // Fazla kelime
+          html += `<span class="word-extra" title="Fazla kelime">${spokenWords[spokenIndex]}</span> `;
+          spokenIndex++;
+        } else if (spokenIndex >= spokenWords.length) {
+          // Eksik kelime
+          html += `<span class="word-missing" title="Atlanan kelime">${originalWords[originalIndex]}</span> `;
+          originalIndex++;
+        } else if (originalWords[originalIndex] === spokenWords[spokenIndex]) {
+          // Doğru kelime
+          html += `<span class="word-correct" title="Doğru">${originalWords[originalIndex]}</span> `;
+          originalIndex++;
+          spokenIndex++;
+        } else {
+          // Hatalı okuma durumları
+          
+          // Atlama kontrolü
+          let foundSkip = false;
+          for (let lookAhead = 1; lookAhead <= Math.min(3, originalWords.length - originalIndex); lookAhead++) {
+            if (originalWords[originalIndex + lookAhead] === spokenWords[spokenIndex]) {
+              // Atlanan kelimeleri işaretle
+              for (let i = 0; i < lookAhead; i++) {
+                html += `<span class="word-missing" title="Atlanan kelime">${originalWords[originalIndex + i]}</span> `;
+              }
+              originalIndex += lookAhead;
+              foundSkip = true;
+              break;
+            }
+          }
+          
+          if (foundSkip) continue;
+          
+          // Çift okuma kontrolü
+          if (spokenIndex > 0 && spokenWords[spokenIndex] === spokenWords[spokenIndex - 1]) {
+            html += `<span class="word-extra" title="Çift okunmuş kelime" style="background:#e7f3ff;border-color:#007bff;">${spokenWords[spokenIndex]}</span> `;
+            spokenIndex++;
+            continue;
+          }
+          
+          // Fazla kelime kontrolü
+          let foundExtra = false;
+          for (let lookAhead = 1; lookAhead <= Math.min(3, spokenWords.length - spokenIndex); lookAhead++) {
+            if (originalWords[originalIndex] === spokenWords[spokenIndex + lookAhead]) {
+              // Fazla kelimeleri işaretle
+              for (let i = 0; i < lookAhead; i++) {
+                html += `<span class="word-extra" title="Fazla kelime">${spokenWords[spokenIndex + i]}</span> `;
+              }
+              spokenIndex += lookAhead;
+              foundExtra = true;
+              break;
+            }
+          }
+          
+          if (foundExtra) continue;
+          
+          // Basit hata
+          html += `<span class="word-error" title="Hatalı: '${originalWords[originalIndex]}' yerine '${spokenWords[spokenIndex]}'">${spokenWords[spokenIndex]}</span> `;
+          originalIndex++;
+          spokenIndex++;
+        }
+      }
+      
+      html += '</div>';
+      
+      return html;
+    }
 
     // Giriş
     function enterStudent() {
@@ -689,7 +935,7 @@
       timer.classList.remove('warning', 'danger');
     }
 
-    // Sonuçları hesapla
+    // Sonuçları hesapla (Gelişmiş versiyon)
     function calculateResults() {
       if (!currentText || !transcript.trim()) {
         alert('Okuma kaydedilmedi. Lütfen tekrar dene.');
@@ -697,14 +943,17 @@
       }
 
       const readingTime = (Date.now() - startTime) / 1000; // saniye
-      const originalWords = currentText.content.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-      const spokenWords = transcript.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+      
+      // Normalize edilmiş kelimeler
+      const originalWords = normalizeText(currentText.content);
+      const spokenWords = normalizeText(transcript);
       
       // WPM hesapla
       const wpm = Math.round((spokenWords.length / readingTime) * 60);
       
-      // Hata analizi
-      const errors = calculateErrors(originalWords, spokenWords);
+      // Gelişmiş hata analizi
+      const errorAnalysis = calculateErrors(originalWords, spokenWords);
+      const errors = errorAnalysis.total;
       const wordsRead = spokenWords.length;
       const accuracy = wordsRead > 0 ? Math.round(((wordsRead - errors) / wordsRead) * 100) : 0;
       
@@ -714,12 +963,23 @@
       document.getElementById('errorsResult').textContent = errors;
       document.getElementById('accuracyResult').textContent = accuracy + '%';
       
-      // Karşılaştırma
+      // Gelişmiş karşılaştırma
       const comparison = createComparison(originalWords, spokenWords);
       document.getElementById('comparisonArea').innerHTML = comparison;
       
       // Sonuç bölümünü göster
       document.getElementById('resultsSection').classList.remove('hidden');
+      
+      // Detaylı analiz bilgisi
+      console.log('Okuma Analizi:', {
+        originalWords: originalWords.length,
+        spokenWords: spokenWords.length,
+        errors: errors,
+        skippedWords: errorAnalysis.skipped,
+        duplicates: errorAnalysis.duplicates,
+        accuracy: accuracy + '%',
+        wpm: wpm
+      });
       
       // Sonucu kaydet
       saveReading({
@@ -731,46 +991,6 @@
         wpm: wpm,
         detail_html: comparison
       });
-    }
-
-    // Hata hesaplama
-    function calculateErrors(original, spoken) {
-      let errors = 0;
-      const maxLen = Math.max(original.length, spoken.length);
-      
-      for (let i = 0; i < maxLen; i++) {
-        if (i >= original.length || i >= spoken.length) {
-          errors++; // Eksik veya fazla kelime
-        } else if (original[i] !== spoken[i]) {
-          errors++; // Yanlış kelime
-        }
-      }
-      
-      return errors;
-    }
-
-    // Metin karşılaştırması oluştur
-    function createComparison(original, spoken) {
-      let html = '';
-      const maxLen = Math.max(original.length, spoken.length);
-      
-      for (let i = 0; i < maxLen; i++) {
-        if (i >= original.length) {
-          // Fazla kelime
-          html += `<span class="word-extra">${spoken[i]}</span> `;
-        } else if (i >= spoken.length) {
-          // Eksik kelime
-          html += `<span class="word-missing">${original[i]}</span> `;
-        } else if (original[i] === spoken[i]) {
-          // Doğru kelime
-          html += `<span class="word-correct">${original[i]}</span> `;
-        } else {
-          // Yanlış kelime
-          html += `<span class="word-error">${spoken[i]}</span> `;
-        }
-      }
-      
-      return html;
     }
 
     // Sonucu kaydet

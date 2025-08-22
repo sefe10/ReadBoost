@@ -1,1 +1,354 @@
-<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Detay</title><link rel="stylesheet" href="style.css"></head><body><div class="container"><div class="card"><h1>Okuma Detayı</h1><a href="teacher.html"><button class="secondary">Öğretmen Paneline Dön</button></a></div><div class="card"><h2>Renkli Fark</h2><div id="diff" class="mono"></div><p class="small">Yeşil: doğru • Sarı: farklı söylenmiş • Kırmızı üstü çizili: atlanan • Mavi: fazladan söylenen</p></div><div class="card"><h2>Referans Metin</h2><pre id="ref" class="mono"></pre></div><div class="card"><h2>Transcript</h2><pre id="hyp" class="mono"></pre></div></div><script>async function load(){ const p=new URLSearchParams(location.search); const id=p.get('id'); if(!id) return; const r=await fetch('/api/reading/'+id+'/detail'); const d=await r.json(); document.getElementById('diff').innerHTML=d.detail_html; document.getElementById('ref').textContent=d.ref_text; document.getElementById('hyp').textContent=d.transcript; } load();</script></body></html>
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Detay</title>
+  <style>
+    /* Temel stiller */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .card {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .card h1, .card h2 {
+      margin-top: 0;
+      color: #333;
+    }
+    
+    button {
+      background: #6c757d;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      text-decoration: none;
+      display: inline-block;
+    }
+    
+    button:hover {
+      background: #5a6268;
+    }
+    
+    .small {
+      color: #666;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    
+    /* Monospace alanlar için stiller */
+    .mono {
+      font-family: 'Courier New', Courier, monospace;
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
+      line-height: 1.6;
+      font-size: 14px;
+      
+      /* CRITICAL: Uzun metinlerin taşmasını önle */
+      word-wrap: break-word;
+      word-break: break-word;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      max-width: 100%;
+    }
+    
+    /* Renkli karşılaştırma stilleri */
+    #diff {
+      line-height: 2;
+      font-size: 16px;
+    }
+    
+    /* Kelime renk kodlaması */
+    .word-correct, .w.ok {
+      background: #d4edda;
+      color: #155724;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin: 0 2px;
+      border: 1px solid #c3e6cb;
+      display: inline-block;
+    }
+    
+    .word-error, .w.sub {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin: 0 2px;
+      text-decoration: line-through;
+      border: 1px solid #f5c6cb;
+      display: inline-block;
+    }
+    
+    .word-missing, .w.del {
+      background: #fff3cd;
+      color: #856404;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin: 0 2px;
+      border: 1px solid #ffeaa7;
+      font-style: italic;
+      text-decoration: line-through;
+      display: inline-block;
+    }
+    
+    .word-extra, .w.ins {
+      background: #d1ecf1;
+      color: #0c5460;
+      padding: 2px 4px;
+      border-radius: 4px;
+      margin: 0 2px;
+      border: 1px solid #b6d7e2;
+      font-weight: bold;
+      display: inline-block;
+    }
+    
+    /* Eski stil sınıfları için uyumluluk */
+    .diff .w {
+      padding: 2px 6px;
+      margin: 2px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    
+    .diff .ok {
+      background: rgba(22,163,74,0.12);
+      border: 1px solid rgba(22,163,74,0.22);
+      color: #15803d;
+    }
+    
+    .diff .sub {
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.22);
+      color: #d97706;
+    }
+    
+    .diff .del {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.16);
+      text-decoration: line-through;
+      color: #dc2626;
+    }
+    
+    .diff .ins {
+      background: rgba(14,165,164,0.08);
+      border: 1px solid rgba(14,165,164,0.16);
+      color: #0891b2;
+      font-weight: bold;
+    }
+    
+    /* Hata raporu kutusu */
+    .error-summary {
+      background: #fff3cd;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 8px;
+      border-left: 4px solid #ffc107;
+      font-size: 14px;
+    }
+    
+    .error-summary strong {
+      color: #856404;
+    }
+    
+    /* Responsive tasarım */
+    @media (max-width: 768px) {
+      .container {
+        padding: 10px;
+      }
+      
+      .card {
+        padding: 15px;
+      }
+      
+      .mono {
+        font-size: 12px;
+        padding: 15px;
+      }
+      
+      #diff {
+        font-size: 14px;
+      }
+    }
+    
+    /* Scroll bar stilleri */
+    .mono::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    .mono::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    
+    .mono::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+    
+    .mono::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+    
+    /* Loading state */
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    
+    .error {
+      text-align: center;
+      padding: 40px;
+      color: #dc3545;
+      background: #f8d7da;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>📊 Okuma Detayı</h1>
+      <a href="teacher.html">
+        <button>← Öğretmen Paneline Dön</button>
+      </a>
+    </div>
+
+    <div class="card">
+      <h2>🎨 Renkli Karşılaştırma</h2>
+      <div id="diff" class="mono">
+        <div class="loading">Veriler yükleniyor...</div>
+      </div>
+      <div class="small">
+        <strong>Renk Açıklaması:</strong><br>
+        <span class="word-correct">Yeşil: Doğru kelime</span> • 
+        <span class="word-error">Kırmızı çizgili: Yanlış kelime</span> • 
+        <span class="word-missing">Sarı italik: Atlanan kelime</span> • 
+        <span class="word-extra">Mavi kalın: Fazla kelime</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📖 Referans Metin (Orijinal)</h2>
+      <div id="ref" class="mono">
+        <div class="loading">Veriler yükleniyor...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🎙️ Öğrenci Okuması (Transcript)</h2>
+      <div id="hyp" class="mono">
+        <div class="loading">Veriler yükleniyor...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function load() {
+      try {
+        const params = new URLSearchParams(location.search);
+        const id = params.get('id');
+        
+        if (!id) {
+          showError('Okuma ID\'si bulunamadı. URL\'de ?id=123 parametresi olmalı.');
+          return;
+        }
+        
+        // Loading state göster
+        document.getElementById('diff').innerHTML = '<div class="loading">📊 Karşılaştırma analizi yükleniyor...</div>';
+        document.getElementById('ref').innerHTML = '<div class="loading">📖 Orijinal metin yükleniyor...</div>';
+        document.getElementById('hyp').innerHTML = '<div class="loading">🎙️ Öğrenci okuması yükleniyor...</div>';
+        
+        const response = await fetch('/api/reading/' + id + '/detail');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data) {
+          throw new Error('Veri bulunamadı');
+        }
+        
+        // Renkli karşılaştırmayı göster
+        const diffElement = document.getElementById('diff');
+        if (data.detail_html && data.detail_html.trim()) {
+          diffElement.innerHTML = data.detail_html;
+        } else {
+          // Eğer detail_html yoksa, basit karşılaştırma yap
+          diffElement.innerHTML = '<div class="error">⚠️ Renkli karşılaştırma verisi bulunamadı. Bu okuma eski sistemde yapılmış olabilir.</div>';
+        }
+        
+        // Orijinal metni göster
+        const refElement = document.getElementById('ref');
+        if (data.ref_text || data.content) {
+          refElement.textContent = data.ref_text || data.content || 'Metin bulunamadı';
+        } else {
+          refElement.innerHTML = '<div class="error">❌ Referans metin bulunamadı</div>';
+        }
+        
+        // Öğrenci okumasını göster
+        const hypElement = document.getElementById('hyp');
+        if (data.transcript && data.transcript.trim()) {
+          hypElement.textContent = data.transcript;
+        } else {
+          hypElement.innerHTML = '<div class="error">❌ Öğrenci okuması bulunamadı veya boş</div>';
+        }
+        
+        // Sayfa başlığını güncelle
+        if (data.title) {
+          document.title = `${data.title} - Okuma Detayı`;
+        }
+        
+      } catch (error) {
+        console.error('Veri yükleme hatası:', error);
+        showError('Veriler yüklenirken hata oluştu: ' + error.message);
+      }
+    }
+    
+    function showError(message) {
+      const errorHtml = `<div class="error">❌ ${message}</div>`;
+      document.getElementById('diff').innerHTML = errorHtml;
+      document.getElementById('ref').innerHTML = errorHtml;
+      document.getElementById('hyp').innerHTML = errorHtml;
+    }
+    
+    // Sayfa yüklendiğinde çalıştır
+    document.addEventListener('DOMContentLoaded', load);
+    
+    // Hata durumunda sayfa yenileme özelliği
+    window.addEventListener('error', function(e) {
+      console.error('Sayfa hatası:', e.error);
+    });
+    
+    // Network hatalarını yakala
+    window.addEventListener('unhandledrejection', function(e) {
+      console.error('Promise hatası:', e.reason);
+    });
+  </script>
+</body>
+</html>
